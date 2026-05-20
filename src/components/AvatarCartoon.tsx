@@ -40,15 +40,29 @@ export default function AvatarCartoon({
   };
 
   const style = getGradient(avatar, seedName);
+  const isUrl = avatar.includes("http") || avatar.includes("/") || (avatar.includes(".") && avatar.length > 4);
 
   return (
     <div
-      style={style}
-      className={`rounded-2xl flex items-center justify-center font-bold text-black shadow-inner select-none shrink-0 ${sizeClasses[size]} ${className}`}
+      style={!isUrl ? style : undefined}
+      className={`rounded-2xl flex items-center justify-center font-bold text-black shadow-inner select-none shrink-0 overflow-hidden ${sizeClasses[size]} ${className} ${isUrl ? 'bg-zinc-900 border border-border/50' : ''}`}
     >
-      <span className="drop-shadow-[0_2px_4px_rgba(0,0,0,0.15)] animate-[wiggle_1.5s_ease-in-out_infinite] hover:scale-115 transition-transform duration-200">
-        {avatar}
-      </span>
+      {isUrl ? (
+        <img 
+          src={avatar} 
+          alt={seedName} 
+          className="w-full h-full object-cover" 
+          onError={(e) => {
+            // Fallback to ghost emoji if image fails to load
+            (e.target as HTMLImageElement).src = ""; // Clear to prevent infinite loop
+            (e.target as HTMLImageElement).style.display = "none";
+          }}
+        />
+      ) : (
+        <span className="drop-shadow-[0_2px_4px_rgba(0,0,0,0.15)] animate-[wiggle_1.5s_ease-in-out_infinite] hover:scale-115 transition-transform duration-200">
+          {avatar}
+        </span>
+      )}
     </div>
   );
 }
