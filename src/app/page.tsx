@@ -11,6 +11,10 @@ import { Sparkles, MessageCircle } from "lucide-react";
 import MoodBadge, { MoodType } from "@/components/MoodBadge";
 import EmptyState from "@/components/EmptyState";
 import LoadingState from "@/components/LoadingState";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
+import { getPosts, toggleLike, getPostById } from "@/actions/postActions";
+import { getPusherClient } from "@/lib/pusher";
 
 export default function HomeFeedPage() {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -20,22 +24,114 @@ export default function HomeFeedPage() {
   const { accent } = useTheme();
 
   useEffect(() => {
-    // Load default and custom posts from localStorage
-    const loadPosts = () => {
-      const savedCustom = localStorage.getItem("jc_custom_posts");
-      const customPosts: Post[] = savedCustom ? JSON.parse(savedCustom) : [];
-      
-      // Combine custom posts (newest first) and mock posts
-      setPosts([...customPosts, ...MOCK_POSTS]);
-      setLoading(false);
+    // Load posts from database
+    const loadPosts = async () => {
+      try {
+        const dbPosts = await getPosts(user?.id);
+        
+        // Map DB posts to the Post interface used by components
+        const mappedPosts: Post[] = (dbPosts as any[]).map(p => ({
+          id: p.id,
+          content: p.content,
+          mood: p.mood as MoodType,
+          imageUrl: p.imageUrl || undefined,
+          createdAt: new Date(p.createdAt).toLocaleDateString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+          isAnonymous: p.isAnonymous,
+          author: {
+            nickname: p.author?.username || "Anonim",
+            avatar: p.author?.avatar || "👻",
+          },
+          authorIsPrivate: p.author?.isPrivate,
+          likes: p.likes,
+          commentsCount: p.commentsCount,
+          isLiked: p.isLiked,
+        }));
+
+        setPosts(mappedPosts);
+      } catch (error) {
+        toast.error("Gagal memuat curhatan dari semesta... 🌌");
+        console.error(error);
+      } finally {
+        setLoading(false);
+      }
     };
 
-    // Simulate loading for cute transition
-    const timer = setTimeout(loadPosts, 650);
-    return () => clearTimeout(timer);
-  }, []);
+    loadPosts();
+  }, [user?.id]);
 
-  const handleLikePost = (postId: string) => {
+  useEffect(() => {
+    if (!process.env.NEXT_PUBLIC_PUSHER_KEY) return;
+    
+    const pusher = getPusherClient();
+    const channel = pusher.subscribe("jago-curhat");
+
+    channel.bind("new-post", async (data: any) => {
+      // Don't add if it's mine (already optimistic or handled)
+      if (data.userId === user?.id) return;
+
+      try {
+        const newPostData = await getPostById(data.id, user?.id);
+        if (newPostData) {
+          const mapped: Post = {
+            id: newPostData.id,
+            content: newPostData.content,
+            mood: newPostData.mood as MoodType,
+            imageUrl: newPostData.imageUrl || undefined,
+            createdAt: "Baru saja",
+            isAnonymous: newPostData.isAnonymous,
+            author: {
+              nickname: newPostData.author?.username || "Anonim",
+              avatar: newPostData.author?.avatar || "👻",
+            },
+            authorIsPrivate: newPostData.author?.isPrivate,
+            likes: newPostData.likes,
+            commentsCount: newPostData.commentsCount,
+            isLiked: newPostData.isLiked,
+          };
+          setPosts(prev => [mapped, ...prev]);
+        }
+      } catch (err) {
+        console.error("Realtime fetch error:", err);
+      }
+    });
+
+    // Realtime likes
+    channel.bind("new-like", (data: any) => {
+      // Update like count in feed
+      getPostById(data.postId, user?.id).then(dbPost => {
+        if (dbPost) {
+           setPosts(prev => prev.map(p => p.id === data.postId ? { ...p, likes: dbPost.likes } : p));
+        }
+      });
+    });
+
+    // Realtime comments
+    channel.bind("new-comment", (data: any) => {
+      // Update comment count in feed
+      getPostById(data.postId, user?.id).then(dbPost => {
+        if (dbPost) {
+           setPosts(prev => prev.map(p => p.id === data.postId ? { ...p, commentsCount: dbPost.commentsCount } : p));
+        }
+      });
+    });
+
+    return () => {
+      channel.unbind_all();
+      pusher.unsubscribe("jago-curhat");
+    };
+  }, [user?.id]);
+
+  const router = useRouter();
+
+  const handleLikePost = async (postId: string) => {
+    if (!user) {
+      toast.error("Masuk dulu ya buat kasih dukungan! 👻");
+      router.push("/login");
+      return;
+    }
+
+    // Optimistic UI update
+    const previousPosts = [...posts];
     const updated = posts.map((p) => {
       if (p.id === postId) {
         const nextLiked = !p.isLiked;
@@ -49,25 +145,11 @@ export default function HomeFeedPage() {
     });
     setPosts(updated);
 
-    // Save to custom posts storage if it's a custom post
-    const savedCustom = localStorage.getItem("jc_custom_posts");
-    if (savedCustom) {
-      const customPosts: Post[] = JSON.parse(savedCustom);
-      const isCustom = customPosts.some((cp) => cp.id === postId);
-      if (isCustom) {
-        const updatedCustom = customPosts.map((p) => {
-          if (p.id === postId) {
-            const nextLiked = !p.isLiked;
-            return {
-              ...p,
-              isLiked: nextLiked,
-              likes: nextLiked ? p.likes + 1 : p.likes - 1,
-            };
-          }
-          return p;
-        });
-        localStorage.setItem("jc_custom_posts", JSON.stringify(updatedCustom));
-      }
+    try {
+      await toggleLike(postId, user.id);
+    } catch (error) {
+      setPosts(previousPosts);
+      toast.error("Gagal mengirim dukungan... 🌌");
     }
   };
 
@@ -84,10 +166,20 @@ export default function HomeFeedPage() {
     "Lega",
   ];
 
-  // Filter posts based on mood
-  const filteredPosts = selectedMood === "Semua"
-    ? posts
-    : posts.filter((p) => p.mood === selectedMood);
+  // Filter posts based on mood AND privacy logic
+  const filteredPosts = posts.filter((p) => {
+    // 1. Mood filter
+    if (selectedMood !== "Semua" && p.mood !== selectedMood) return false;
+
+    // 2. Privacy filter: 
+    // If author is private AND not anonymous AND not the current user AND not a friend
+    if (p.authorIsPrivate && !p.isAnonymous && user?.nickname !== p.author.nickname) {
+      const isFriend = user?.friends?.includes(p.author.nickname);
+      if (!isFriend) return false;
+    }
+
+    return true;
+  });
 
   return (
     <div className="flex-1 flex flex-col bg-background pb-20">

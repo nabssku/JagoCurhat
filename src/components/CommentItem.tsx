@@ -5,6 +5,9 @@ import AvatarCartoon from "./AvatarCartoon";
 import { Heart } from "lucide-react";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
+
+import Link from "next/link";
 
 export interface Comment {
   id: string;
@@ -15,6 +18,7 @@ export interface Comment {
     nickname: string;
     avatar: string;
   };
+  imageUrl?: string;
   likes: number;
   isLiked?: boolean;
 }
@@ -25,6 +29,7 @@ interface CommentItemProps {
 }
 
 export default function CommentItem({ comment, onLike }: CommentItemProps) {
+  const { user } = useAuth();
   const [liked, setLiked] = useState(comment.isLiked || false);
   const [likesCount, setLikesCount] = useState(comment.likes);
 
@@ -42,27 +47,55 @@ export default function CommentItem({ comment, onLike }: CommentItemProps) {
 
   const displayName = comment.isAnonymous ? "Anonim" : comment.author.nickname;
   const displayAvatar = comment.isAnonymous ? "👻" : comment.author.avatar;
+  const isMe = user?.nickname === comment.author.nickname;
+  const profileHref = isMe ? "/profile" : `/user/${comment.author.nickname}`;
 
   return (
     <div className="flex gap-3 p-4 rounded-2xl bg-card/40 border border-border/40 select-none">
-      <AvatarCartoon
-        avatar={displayAvatar}
-        seedName={displayName}
-        size="sm"
-      />
+      {comment.isAnonymous ? (
+        <AvatarCartoon
+          avatar={displayAvatar}
+          seedName={displayName}
+          size="sm"
+        />
+      ) : (
+        <Link href={profileHref} className="tap-highlight-none">
+          <AvatarCartoon
+            avatar={displayAvatar}
+            seedName={displayName}
+            size="sm"
+          />
+        </Link>
+      )}
       <div className="flex-1 space-y-1.5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-bold text-foreground">{displayName}</span>
-            {comment.isAnonymous && (
-              <span className="text-[9px] bg-accent/15 text-accent px-1 rounded-sm font-semibold">
-                Anonim
-              </span>
+            {comment.isAnonymous ? (
+              <>
+                <span className="text-xs font-bold text-foreground">{displayName}</span>
+                <span className="text-[9px] bg-accent/15 text-accent px-1 rounded-sm font-semibold">
+                  Anonim
+                </span>
+              </>
+            ) : (
+              <Link href={profileHref} className="hover:text-accent transition-colors duration-200">
+                <span className="text-xs font-bold text-foreground">{displayName}</span>
+              </Link>
             )}
           </div>
           <span className="text-[10px] text-text-muted">{comment.createdAt}</span>
         </div>
-        <p className="text-sm text-zinc-300 leading-relaxed">{comment.content}</p>
+        <div 
+          className="text-sm text-zinc-300 leading-relaxed rich-content"
+          dangerouslySetInnerHTML={{ __html: comment.content }}
+        />
+        
+        {/* Comment Image (if any) - Cute styling */}
+        {comment.imageUrl && (
+          <div className="rounded-xl overflow-hidden border border-border/30 shadow-sm mt-2 max-w-[200px]">
+            <img src={comment.imageUrl} alt="Lampiran Balasan" className="w-full object-cover max-h-40" />
+          </div>
+        )}
       </div>
 
       {/* Heart rate indicator */}

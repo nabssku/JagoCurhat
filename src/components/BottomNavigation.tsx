@@ -11,9 +11,11 @@ export default function BottomNavigation() {
   const pathname = usePathname();
   const { accent } = useTheme();
 
-  // Hide navigation on auth/onboarding routes
+  // Hide navigation on auth/onboarding routes or post detail
   const hideRoutes = ["/login", "/register", "/onboarding"];
-  if (hideRoutes.includes(pathname)) return null;
+  const isPostDetail = pathname.startsWith("/post/");
+  
+  if (hideRoutes.includes(pathname) || isPostDetail) return null;
 
   const navigationItems = [
     { name: "Beranda", icon: Home, path: "/" },

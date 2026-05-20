@@ -5,48 +5,133 @@ import Link from "next/link";
 import { useAuth } from "@/hooks/useAuth";
 import AvatarCartoon from "@/components/AvatarCartoon";
 import PostCard, { Post } from "@/components/PostCard";
-import { Settings, PenTool, Bookmark, MessageSquareHeart } from "lucide-react";
-import { MOCK_POSTS } from "@/constants/dummyData";
+import { Settings, PenTool, Bookmark, Lock } from "lucide-react";
 import EmptyState from "@/components/EmptyState";
+import { getUserPosts, getBookmarkedPosts, toggleLike, toggleBookmark, deletePost } from "@/actions/postActions";
+import { getUserProfile } from "@/actions/userActions";
+import { getPusherClient } from "@/lib/pusher";
+import { toast } from "sonner";
 
 export default function ProfilePage() {
-  const { user } = useAuth();
+  const { user: authUser } = useAuth();
+  const [userProfile, setUserProfile] = useState<any>(null);
   const [activeTab, setActiveTab] = useState<"curhat" | "bookmark">("curhat");
   const [myPosts, setMyPosts] = useState<Post[]>([]);
   const [bookmarkedPosts, setBookmarkedPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Load custom posts created by the user
-    const savedCustom = localStorage.getItem("jc_custom_posts");
-    const customPosts: Post[] = savedCustom ? JSON.parse(savedCustom) : [];
+    if (!process.env.NEXT_PUBLIC_PUSHER_KEY) return;
     
-    // Filter posts created by the current user
-    const userPosts = customPosts.filter((p) => p.author.nickname === user?.nickname && !p.isAnonymous);
-    setMyPosts(userPosts);
+    const pusher = getPusherClient();
+    const channel = pusher.subscribe("jago-curhat");
 
-    // Bookmarks list (simulation: filters posts that are marked as bookmarked)
-    const allPosts = [...customPosts, ...MOCK_POSTS];
-    const bookmarks = allPosts.filter((p) => p.isBookmarked);
-    setBookmarkedPosts(bookmarks);
-  }, [user]);
+    // Realtime follow/post stats
+    channel.bind("new-follow", (data: any) => {
+      if (data.userId === authUser?.id || data.followerId === authUser?.id) {
+        loadData();
+      }
+    });
 
-  const handleLikePost = (postId: string) => {
-    // Basic like simulation inside profile view
-    const updateLikes = (list: Post[]) =>
-      list.map((p) => {
-        if (p.id === postId) {
-          const nextLiked = !p.isLiked;
-          return {
-            ...p,
-            isLiked: nextLiked,
-            likes: nextLiked ? p.likes + 1 : p.likes - 1,
-          };
-        }
-        return p;
-      });
+    channel.bind("new-post", (data: any) => {
+      if (data.userId === authUser?.id) {
+        loadData();
+      }
+    });
 
-    setMyPosts((prev) => updateLikes(prev));
-    setBookmarkedPosts((prev) => updateLikes(prev));
+    return () => {
+      pusher.unsubscribe("jago-curhat");
+    };
+  }, [authUser?.id, activeTab]);
+
+  useEffect(() => {
+    if (authUser?.id) {
+      loadData();
+    }
+  }, [authUser?.id, activeTab]);
+
+  const loadData = async () => {
+    if (!authUser) return;
+    setLoading(true);
+    try {
+      // Fetch profile and posts in parallel for fresh stats
+      const [profile, posts] = await Promise.all([
+        getUserProfile(authUser.nickname),
+        activeTab === "curhat" 
+          ? getUserPosts(authUser.id, authUser.id)
+          : getBookmarkedPosts(authUser.id)
+      ]);
+
+      if (profile) setUserProfile(profile);
+      
+      if (activeTab === "curhat") {
+        setMyPosts(mapPosts(posts));
+      } else {
+        setBookmarkedPosts(mapPosts(posts));
+      }
+    } catch (error) {
+      toast.error("Gagal memuat memory curhatmu... 🌌");
+      console.error(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const mapPosts = (dbPosts: any[]): Post[] => {
+    return dbPosts.map(p => ({
+      id: p.id,
+      content: p.content,
+      mood: p.mood as any,
+      imageUrl: p.imageUrl || undefined,
+      createdAt: new Date(p.createdAt).toLocaleDateString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+      isAnonymous: p.isAnonymous,
+      author: {
+        nickname: p.author?.username || "Anonim",
+        avatar: p.author?.avatar || "👻",
+      },
+      likes: p.likes,
+      commentsCount: p.commentsCount,
+      isLiked: p.isLiked,
+      isBookmarked: p.isBookmarked,
+    }));
+  };
+
+  const handleDeletePost = async (postId: string) => {
+    if (!authUser) return;
+    
+    // Optimistic update
+    const previousPosts = [...myPosts];
+    setMyPosts(prev => prev.filter(p => p.id !== postId));
+    
+    try {
+      await deletePost(postId, authUser.id);
+      toast.success("Curhatan berhasil dihapus. 🌸");
+      // Optionally refresh stats
+      loadData();
+    } catch (err) {
+      setMyPosts(previousPosts);
+      toast.error("Gagal menghapus curhatan.");
+    }
+  };
+
+  const handleLikePost = async (postId: string) => {
+    if (!authUser) return;
+    try {
+      await toggleLike(postId, authUser.id);
+      loadData(); // Reload to get updated counts
+    } catch (err) {
+      toast.error("Gagal menyukai.");
+    }
+  };
+
+  const handleBookmarkPost = async (postId: string) => {
+    if (!authUser) return;
+    try {
+      await toggleBookmark(postId, authUser.id);
+      loadData();
+    } catch (err) {
+      toast.error("Gagal menyimpan.");
+    }
   };
 
   return (
@@ -63,26 +148,35 @@ export default function ProfilePage() {
       </div>
 
       {/* User Info Card */}
-      {user && (
+      {authUser && (
         <div className="p-5 flex flex-col items-center text-center space-y-4 border-b border-border/40 select-none bg-card/10">
-          <AvatarCartoon avatar={user.avatar} seedName={user.nickname} size="xl" />
+          <AvatarCartoon avatar={userProfile?.avatar || authUser.avatar} seedName={userProfile?.username || authUser.nickname} size="xl" />
           
           <div className="space-y-1">
-            <h2 className="text-base font-bold text-foreground">{user.nickname}</h2>
-            <p className="text-xs text-text-muted">{user.email}</p>
+            <div className="flex items-center justify-center gap-1.5">
+              <h2 className="text-base font-bold text-foreground">{userProfile?.username || authUser.nickname}</h2>
+              {(userProfile?.isPrivate || authUser.isPrivate) && (
+                <div className="p-1 rounded-md bg-accent/10 border border-accent/20" title="Akun Privat">
+                  <Lock size={12} className="text-accent" />
+                </div>
+              )}
+            </div>
+            <p className="text-xs text-text-muted">{authUser.email}</p>
           </div>
 
           {/* Core Stats Row */}
-          <div className="grid grid-cols-2 gap-4 w-full max-w-xs pt-2">
+          <div className="grid grid-cols-3 gap-3 w-full max-w-sm pt-2">
             <div className="p-3 bg-card border border-border/60 rounded-2xl">
-              <p className="text-sm font-bold text-foreground">{myPosts.length}</p>
-              <p className="text-[10px] text-text-muted mt-0.5">Confessions</p>
+              <p className="text-sm font-bold text-foreground">{userProfile?.postsCount || 0}</p>
+              <p className="text-[10px] text-text-muted mt-0.5 whitespace-nowrap">Curhatan</p>
             </div>
             <div className="p-3 bg-card border border-border/60 rounded-2xl">
-              <p className="text-sm font-bold text-foreground">
-                {myPosts.reduce((acc, p) => acc + p.likes, 0) + 12}
-              </p>
-              <p className="text-[10px] text-text-muted mt-0.5">Dukungan</p>
+              <p className="text-sm font-bold text-foreground">{userProfile?.followersCount || 0}</p>
+              <p className="text-[10px] text-text-muted mt-0.5 whitespace-nowrap">Pengikut</p>
+            </div>
+            <div className="p-3 bg-card border border-border/60 rounded-2xl">
+              <p className="text-sm font-bold text-foreground">{userProfile?.followingCount || 0}</p>
+              <p className="text-[10px] text-text-muted mt-0.5 whitespace-nowrap">Mengikuti</p>
             </div>
           </div>
         </div>
@@ -114,11 +208,21 @@ export default function ProfilePage() {
 
       {/* Profile list items content */}
       <div className="p-4 flex-1">
-        {activeTab === "curhat" ? (
+        {loading ? (
+          <div className="flex items-center justify-center py-10">
+            <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : activeTab === "curhat" ? (
           myPosts.length > 0 ? (
             <div className="space-y-4">
               {myPosts.map((post) => (
-                <PostCard key={post.id} post={post} onLike={handleLikePost} />
+                <PostCard 
+                  key={post.id} 
+                  post={post} 
+                  onLike={handleLikePost} 
+                  onBookmark={handleBookmarkPost}
+                  onDelete={handleDeletePost}
+                />
               ))}
             </div>
           ) : (
@@ -133,7 +237,7 @@ export default function ProfilePage() {
         ) : bookmarkedPosts.length > 0 ? (
           <div className="space-y-4">
             {bookmarkedPosts.map((post) => (
-              <PostCard key={post.id} post={post} onLike={handleLikePost} />
+              <PostCard key={post.id} post={post} onLike={handleLikePost} onBookmark={handleBookmarkPost} />
             ))}
           </div>
         ) : (

@@ -23,7 +23,7 @@ export default function EmpathyGhost({
       transition: {
         duration: 3,
         repeat: Infinity,
-        ease: "easeInOut",
+        ease: "easeInOut" as const,
       },
     },
   };
@@ -36,7 +36,7 @@ export default function EmpathyGhost({
       transition: {
         duration: 3,
         repeat: Infinity,
-        ease: "easeInOut",
+        ease: "easeInOut" as const,
       },
     },
   };
@@ -194,7 +194,7 @@ export default function EmpathyGhost({
         transition: {
           duration: 1.5,
           repeat: Infinity,
-          ease: "easeInOut",
+          ease: "easeInOut" as const,
         },
       };
     }

@@ -1,27 +1,61 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { MOCK_POSTS } from "@/constants/dummyData";
+import { useAuth } from "@/hooks/useAuth";
+import { getPosts, searchPosts } from "@/actions/postActions";
+import { toast } from "sonner";
 import PostCard, { Post } from "@/components/PostCard";
-import MoodBadge, { MoodType } from "@/components/MoodBadge";
 import { Search, Flame, TrendingUp } from "lucide-react";
 import EmptyState from "@/components/EmptyState";
+import LoadingState from "@/components/LoadingState";
 
 export default function ExplorePage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [posts, setPosts] = useState<Post[]>([]);
+  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
 
   useEffect(() => {
-    const savedCustom = localStorage.getItem("jc_custom_posts");
-    const customPosts = savedCustom ? JSON.parse(savedCustom) : [];
-    setPosts([...customPosts, ...MOCK_POSTS]);
-  }, []);
+    const fetchPosts = async () => {
+      setLoading(true);
+      try {
+        let dbPosts;
+        if (searchQuery.trim()) {
+          dbPosts = await searchPosts(searchQuery.trim(), user?.id);
+        } else {
+          // Fetch trending/top posts or just recent ones for now
+          dbPosts = await getPosts(user?.id);
+        }
+        
+        const mappedPosts: Post[] = (dbPosts as any[]).map(p => ({
+          id: p.id,
+          content: p.content,
+          mood: p.mood as any,
+          imageUrl: p.imageUrl || undefined,
+          createdAt: new Date(p.createdAt).toLocaleDateString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+          isAnonymous: p.isAnonymous,
+          author: {
+            nickname: p.author?.username || "Anonim",
+            avatar: p.author?.avatar || "👻",
+          },
+          likes: p.likes,
+          commentsCount: p.commentsCount,
+          isLiked: p.isLiked,
+        }));
+        setPosts(mappedPosts);
+      } catch (error) {
+        console.error(error);
+        toast.error("Gagal menjajaki semesta curhat... 🌌");
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  const filteredPosts = posts.filter(
-    (p) =>
-      p.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      p.mood.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+    const timer = setTimeout(fetchPosts, searchQuery ? 500 : 0);
+    return () => clearTimeout(timer);
+  }, [searchQuery, user?.id]);
+
+  const filteredPosts = posts; // Already filtered by server
 
   const trendingHashtags = [
     "#SkripsiMentok",
@@ -53,7 +87,12 @@ export default function ExplorePage() {
           />
         </div>
 
-        {searchQuery ? (
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-3">
+             <div className="w-8 h-8 border-4 border-accent border-t-transparent rounded-full animate-spin" />
+             <p className="text-[10px] text-text-muted animate-pulse font-medium">Mencari cerita senasib...</p>
+          </div>
+        ) : searchQuery ? (
           /* Search results */
           <div className="space-y-4">
             <h2 className="text-xs font-bold text-text-muted uppercase tracking-wider pl-1 select-none">
@@ -98,7 +137,7 @@ export default function ExplorePage() {
                 Curhatan Teratas
               </h2>
               <div className="space-y-4">
-                {posts.slice(0, 3).map((post) => (
+                {posts.slice(0, 5).map((post) => (
                   <PostCard key={post.id} post={post} />
                 ))}
               </div>

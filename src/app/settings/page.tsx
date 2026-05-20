@@ -9,7 +9,7 @@ import { toast } from "sonner";
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { logout, user } = useAuth();
+  const { logout, user, updateProfile } = useAuth();
 
   const handleLogout = () => {
     logout();
@@ -49,6 +49,44 @@ export default function SettingsPage() {
             Personalisasi Tampilan
           </h2>
           <ThemeSelector />
+        </div>
+
+        {/* 2. Privacy & Security */}
+        <div className="space-y-2 select-none">
+          <h2 className="text-xs font-bold text-text-muted uppercase tracking-wider pl-1">
+            Privasi & Keamanan
+          </h2>
+          <div className="bg-card border border-border p-4 rounded-3xl space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <Shield size={14} className="text-accent" />
+                  <span className="text-sm font-bold text-foreground">Akun Privat</span>
+                </div>
+                <p className="text-[10px] text-text-muted max-w-[200px]">
+                  Hanya teman yang disetujui yang dapat melihat curhatan non-anonim kamu.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  if (user) {
+                    const nextValue = !user.isPrivate;
+                    updateProfile(user.nickname, user.avatar, nextValue);
+                    toast.success(nextValue ? "Akun diatur ke privat" : "Akun diatur ke publik");
+                  }
+                }}
+                className={`w-10 h-5 rounded-full relative transition-colors duration-200 cursor-pointer tap-highlight-none ${
+                  user?.isPrivate ? "bg-accent" : "bg-border"
+                }`}
+              >
+                <div
+                  className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all duration-200 ${
+                    user?.isPrivate ? "left-6" : "left-1"
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* 2. App Meta Information */}

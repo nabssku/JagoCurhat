@@ -2,11 +2,13 @@
 
 import React, { useState } from "react";
 import Link from "next/link";
-import { Heart, MessageCircle, Bookmark, Share2 } from "lucide-react";
+import { Heart, MessageCircle, Bookmark, Share2, Trash2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useRouter } from "next/navigation";
 import AvatarCartoon from "./AvatarCartoon";
 import MoodBadge, { MoodType } from "./MoodBadge";
 import { toast } from "sonner";
+import { useAuth } from "@/hooks/useAuth";
 
 export interface Post {
   id: string;
@@ -18,6 +20,8 @@ export interface Post {
     nickname: string;
     avatar: string;
   };
+  authorIsPrivate?: boolean;
+  imageUrl?: string;
   likes: number;
   commentsCount: number;
   isLiked?: boolean;
@@ -28,6 +32,7 @@ interface PostCardProps {
   post: Post;
   onLike?: (id: string) => void;
   onBookmark?: (id: string) => void;
+  onDelete?: (id: string) => void;
   isDetailView?: boolean;
 }
 
@@ -35,12 +40,21 @@ export default function PostCard({
   post,
   onLike,
   onBookmark,
+  onDelete,
   isDetailView = false,
 }: PostCardProps) {
+  const router = useRouter();
+  const { user } = useAuth();
   const [liked, setLiked] = useState(post.isLiked || false);
   const [likesCount, setLikesCount] = useState(post.likes);
   const [bookmarked, setBookmarked] = useState(post.isBookmarked || false);
   const [showHeartPop, setShowHeartPop] = useState(false);
+
+  const handleCardClick = () => {
+    if (!isDetailView) {
+      router.push(`/post/${post.id}`);
+    }
+  };
 
   const handleLike = (e: React.MouseEvent) => {
     e.preventDefault();
@@ -84,9 +98,14 @@ export default function PostCard({
 
   const displayName = post.isAnonymous ? "Anonim" : post.author.nickname;
   const displayAvatar = post.isAnonymous ? "👻" : post.author.avatar;
+  const isMe = user?.nickname === post.author.nickname;
+  const profileHref = isMe ? "/profile" : `/user/${post.author.nickname}`;
 
   const cardContent = (
-    <div className="curhat-card p-5 rounded-3xl transition-all duration-200 select-none flex flex-col gap-4 relative overflow-hidden bg-card border border-border">
+    <div 
+      onClick={handleCardClick}
+      className={`curhat-card p-5 rounded-3xl transition-all duration-200 select-none flex flex-col gap-4 relative overflow-hidden bg-card border border-border ${!isDetailView ? 'cursor-pointer' : ''}`}
+    >
       {/* Pop animation effect */}
       <AnimatePresence>
         {showHeartPop && (
@@ -105,32 +124,82 @@ export default function PostCard({
       {/* Header (Author info + Date) */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <AvatarCartoon
-            avatar={displayAvatar}
-            seedName={displayName}
-            size="md"
-          />
+          {post.isAnonymous ? (
+            <AvatarCartoon
+              avatar={displayAvatar}
+              seedName={displayName}
+              size="md"
+            />
+          ) : (
+            <Link 
+              href={profileHref}
+              onClick={(e) => e.stopPropagation()}
+              className="tap-highlight-none"
+            >
+              <AvatarCartoon
+                avatar={displayAvatar}
+                seedName={displayName}
+                size="md"
+              />
+            </Link>
+          ) }
           <div>
-            <h4 className="text-sm font-bold text-foreground flex items-center gap-1.5">
-              {displayName}
-              {post.isAnonymous && (
+            {post.isAnonymous ? (
+              <h4 className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                {displayName}
                 <span className="text-[10px] bg-accent/15 text-accent px-1.5 py-0.5 rounded-md font-semibold">
                   Anonim
                 </span>
-              )}
-            </h4>
+              </h4>
+            ) : (
+              <Link 
+                href={profileHref}
+                onClick={(e) => e.stopPropagation()}
+                className="hover:text-accent transition-colors duration-200"
+              >
+                <h4 className="text-sm font-bold text-foreground flex items-center gap-1.5">
+                  {displayName}
+                </h4>
+              </Link>
+            ) }
             <span className="text-xs text-text-muted">{post.createdAt}</span>
           </div>
         </div>
 
-        {/* Mood Badge */}
-        <MoodBadge mood={post.mood} size="sm" />
+        {/* Top Right section: Mood + Delete (for author) */}
+        <div className="flex items-center gap-2">
+          <MoodBadge mood={post.mood} size="sm" />
+          
+          {isMe && onDelete && (
+            <button
+               onClick={(e) => {
+                 e.preventDefault();
+                 e.stopPropagation();
+                 if (window.confirm("Hapus curhatan ini selamanya? 😔")) {
+                   onDelete(post.id);
+                 }
+               }}
+               className="p-1.5 rounded-lg hover:bg-rose-500/10 text-text-muted hover:text-rose-500 transition-all duration-200 cursor-pointer btn-bounce tap-highlight-none"
+               title="Hapus"
+            >
+              <Trash2 size={16} />
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Confession body text */}
-      <p className="text-sm leading-relaxed text-zinc-200 whitespace-pre-wrap">
-        {post.content}
-      </p>
+      {/* Confession body text - Render as HTML for Rich Text Support */}
+      <div 
+        className="text-sm leading-relaxed text-zinc-200 whitespace-pre-wrap rich-content"
+        dangerouslySetInnerHTML={{ __html: post.content }}
+      />
+
+      {/* Post Image (if any) - Cute styling */}
+      {post.imageUrl && (
+        <div className="rounded-2xl overflow-hidden border border-border/40 shadow-sm mt-1">
+          <img src={post.imageUrl} alt="Lampiran Curhatan" className="w-full object-cover max-h-64" />
+        </div>
+      )}
 
       {/* Bottom Actions Row */}
       <div className="flex items-center justify-between pt-2 border-t border-border/50 text-text-muted text-xs">
@@ -191,13 +260,5 @@ export default function PostCard({
     </div>
   );
 
-  if (isDetailView) {
-    return cardContent;
-  }
-
-  return (
-    <Link href={`/post/${post.id}`} className="block tap-highlight-none">
-      {cardContent}
-    </Link>
-  );
+  return cardContent;
 }

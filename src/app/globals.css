@@ -138,3 +138,24 @@ body {
 .btn-bounce:active {
   transform: scale(0.96);
 }
+
+/* Rich Content Styling */
+.rich-content span[data-type="mention"] {
+  color: var(--accent);
+  font-weight: 700;
+  background-color: color-mix(in srgb, var(--accent) 10%, transparent);
+  padding: 0 4px;
+  border-radius: 4px;
+}
+
+.rich-content {
+  line-height: 1.6;
+}
+
+.rich-content p {
+  margin-bottom: 0.5rem;
+}
+
+.rich-content p:last-child {
+  margin-bottom: 0;
+}

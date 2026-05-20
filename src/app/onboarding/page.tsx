@@ -36,14 +36,12 @@ export default function OnboardingPage() {
       return;
     }
 
-    const mockEmail = `${nickname.trim().toLowerCase().replace(/\s+/g, "")}@example.com`;
-    await register(mockEmail, nickname.trim(), selectedAvatar);
+    // Save temporary onboarding data to pre-fill registration
+    localStorage.setItem("jc_onboarding_nickname", nickname.trim());
+    localStorage.setItem("jc_onboarding_avatar", selectedAvatar);
     
-    // Complete onboarding flag
-    localStorage.setItem("jagocurhat_onboarding_completed", "true");
-    
-    toast.success(`Selamat datang, ${nickname}! 💜`);
-    router.push("/");
+    toast.success(`Hampir selesai! Ayo buat akunmu, ${nickname} ✨`);
+    router.push("/register");
   };
 
   // Carousel Slides Content

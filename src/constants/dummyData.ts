@@ -31,6 +31,7 @@ export const MOCK_POSTS: Post[] = [
     commentsCount: 2,
     isLiked: true,
     isBookmarked: true,
+    authorIsPrivate: true,
   },
   {
     id: "post-3",
@@ -61,6 +62,7 @@ export const MOCK_POSTS: Post[] = [
     commentsCount: 8,
     isLiked: false,
     isBookmarked: false,
+    authorIsPrivate: false,
   },
   {
     id: "post-5",
@@ -76,6 +78,22 @@ export const MOCK_POSTS: Post[] = [
     commentsCount: 5,
     isLiked: false,
     isBookmarked: false,
+  },
+  {
+    id: "post-6",
+    content: "Halo tetangga! Senang banget bisa kenal kalian semua di sini. Semoga harimu menyenangkan ya! 🌟",
+    mood: "Senang",
+    createdAt: "Baru saja",
+    isAnonymous: false,
+    author: {
+      nickname: "Sarah si Pendengar",
+      avatar: "🎧",
+    },
+    likes: 5,
+    commentsCount: 1,
+    isLiked: false,
+    isBookmarked: false,
+    authorIsPrivate: true,
   },
 ];
 

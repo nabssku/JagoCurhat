@@ -6,19 +6,47 @@ import { useAuth } from "@/hooks/useAuth";
 import { useTheme } from "@/hooks/useTheme";
 import MoodBadge, { MoodType, MOODS_METADATA } from "@/components/MoodBadge";
 import EmpathyGhost from "@/components/EmpathyGhost";
-import { ArrowLeft, Send, HelpCircle } from "lucide-react";
+import { ArrowLeft, Send, HelpCircle, Camera, X } from "lucide-react";
 import { toast } from "sonner";
 import { Post } from "@/components/PostCard";
+import RichEditor from "@/components/RichEditor";
+import { getFollowingList } from "@/actions/followActions";
+
+import { createPost } from "@/actions/postActions";
 
 export default function CreatePostPage() {
   const [content, setContent] = useState("");
   const [selectedMood, setSelectedMood] = useState<MoodType | null>(null);
   const [isAnonymous, setIsAnonymous] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [image, setImage] = useState<string | null>(null);
+  const [following, setFollowing] = useState<any[]>([]);
 
   const { user } = useAuth();
   const { cardStyle } = useTheme();
   const router = useRouter();
+
+  React.useEffect(() => {
+    if (user?.id) {
+      getFollowingList(user.id).then(setFollowing);
+    }
+  }, [user?.id]);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        toast.error("Ukuran gambar maksimal 2MB ya!");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImage(reader.result as string);
+        toast.success("Gambar berhasil ditambahkan! 📸");
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   const handlePost = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,39 +61,27 @@ export default function CreatePostPage() {
       return;
     }
 
+    if (!user) {
+      toast.error("Kamu harus login dulu ya!");
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // Simulate posting delay
-      await new Promise((resolve) => setTimeout(resolve, 600));
-
-      const newPost: Post = {
-        id: `custom-post-${Date.now()}`,
+      await createPost({
+        userId: user.id,
         content: content.trim(),
         mood: selectedMood,
-        createdAt: "Baru saja",
+        imageUrl: image || undefined,
         isAnonymous,
-        author: {
-          nickname: user?.nickname || "Teman Curhat",
-          avatar: user?.avatar || "👻",
-        },
-        likes: 0,
-        commentsCount: 0,
-        isLiked: false,
-        isBookmarked: false,
-      };
+      });
 
-      // Load existing custom posts
-      const savedCustom = localStorage.getItem("jc_custom_posts");
-      const currentCustom: Post[] = savedCustom ? JSON.parse(savedCustom) : [];
-      
-      // Save updated custom posts (prepend)
-      localStorage.setItem("jc_custom_posts", JSON.stringify([newPost, ...currentCustom]));
-
-      toast.success("Curhatan berhasil dibagikan! ❤️");
+      toast.success("Curhatan berhasil dibagikan ke semesta! ❤️");
       router.push("/");
-    } catch {
-      toast.error("Gagal mengirim curhatan.");
+    } catch (error) {
+      toast.error("Yah, gagal mengirim curhatan. Coba lagi ya!");
+      console.error(error);
     } finally {
       setLoading(false);
     }
@@ -100,34 +116,56 @@ export default function CreatePostPage() {
 
       <form onSubmit={handlePost} className="p-4 flex-1 flex flex-col space-y-6">
         
-        {/* Confession editor textarea */}
+        {/* Confession editor - Rich Text */}
         <div className="space-y-2">
-          <textarea
-            placeholder="Tulis apa yang sedang kamu rasakan... (tenang, kamu bisa kirim secara anonim)"
-            value={content}
-            onChange={(e) => setContent(e.target.value.slice(0, 350))}
-            className="curhat-input w-full min-h-[160px] p-4 rounded-3xl bg-card border border-border text-sm text-foreground focus:outline-none placeholder-zinc-700 resize-none font-medium"
-          />
+          <div className="relative">
+            <RichEditor 
+              content={content} 
+              onChange={setContent}
+              placeholder="Tulis apa yang sedang kamu rasakan... (tenang, kamu bisa kirim secara anonim)"
+              mentions={following.map(f => f.username)}
+            />
+            {/* Image Upload Button overlay or below? I'll put it in a clean row below but the user had it absolute. In RichEditor I have a footer area I could use, but for now I'll just keep it accessible here. */}
+            <div className="mt-2 flex items-center gap-2">
+              <label className="p-2.5 rounded-xl bg-card border border-border hover:border-accent/40 hover:text-accent cursor-pointer transition-all btn-bounce flex items-center gap-2 text-[10px] font-bold">
+                <Camera size={16} /> Tambah Foto
+                <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} />
+              </label>
+              {image && (
+                <div className="relative group">
+                  <img src={image} alt="Preview" className="w-10 h-10 rounded-lg object-cover border border-accent/30 shadow-sm shadow-accent/10" />
+                  <button
+                    type="button"
+                    onClick={() => setImage(null)}
+                    className="absolute -top-2 -right-2 p-0.5 rounded-full bg-rose-500 text-white shadow-md hover:scale-110 transition-transform"
+                  >
+                    <X size={12} />
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
           <div className="flex justify-between items-center text-[10px] text-text-muted px-1 select-none">
             <span>Hindari menyinggung SARA & bullying</span>
-            <span>{content.length}/350 Karakter</span>
+            <span>{content.replace(/<[^>]*>/g, '').length}/350 Karakter</span>
           </div>
         </div>
 
-        {/* Mood badges selector */}
+        {/* Mood badges selector - Carousel style */}
         <div className="space-y-3">
           <label className="text-xs font-bold text-text-muted uppercase tracking-wider pl-1 select-none">
             Pilih Mood Saat Ini <span className="text-rose-400">*</span>
           </label>
-          <div className="grid grid-cols-3 gap-2.5">
+          <div className="flex overflow-x-auto no-scrollbar gap-3 pb-2 px-1">
             {moodsList.map((mood) => (
-              <MoodBadge
-                key={mood}
-                mood={mood}
-                interactive
-                selected={selectedMood === mood}
-                onClick={() => setSelectedMood(mood)}
-              />
+              <div key={mood} className="shrink-0 min-w-[100px]">
+                <MoodBadge
+                  mood={mood}
+                  interactive
+                  selected={selectedMood === mood}
+                  onClick={() => setSelectedMood(mood)}
+                />
+              </div>
             ))}
           </div>
         </div>
