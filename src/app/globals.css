@@ -1,0 +1,140 @@
+@import "tailwindcss";
+
+:root {
+  --background: #000000;
+  --foreground: #f5f5f5;
+  --card: #0d0d0d;
+  --card-foreground: #f5f5f5;
+  --border: #1a1a1a;
+  --text-muted: #a3a3a3;
+  --input: #151515;
+
+  /* Accent default (Purple) */
+  --accent: #a855f7;
+  --accent-foreground: #ffffff;
+  --accent-hover: #c084fc;
+}
+
+[data-accent="purple"] {
+  --accent: #a855f7;
+  --accent-foreground: #ffffff;
+  --accent-hover: #c084fc;
+}
+
+[data-accent="pink"] {
+  --accent: #ec4899;
+  --accent-foreground: #ffffff;
+  --accent-hover: #f472b6;
+}
+
+[data-accent="blue"] {
+  --accent: #3b82f6;
+  --accent-foreground: #ffffff;
+  --accent-hover: #60a5fa;
+}
+
+[data-accent="green"] {
+  --accent: #10b981;
+  --accent-foreground: #000000;
+  --accent-hover: #34d399;
+}
+
+[data-accent="orange"] {
+  --accent: #f97316;
+  --accent-foreground: #ffffff;
+  --accent-hover: #fb923c;
+}
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-border: var(--border);
+  --color-text-muted: var(--text-muted);
+  --color-input: var(--input);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent-hover: var(--accent-hover);
+
+  --font-sans: var(--font-quicksand), system-ui, -apple-system, sans-serif;
+}
+
+/* Base custom styles */
+body {
+  background-color: #030303;
+  color: var(--foreground);
+  font-family: var(--font-quicksand), sans-serif;
+  overflow-x: hidden;
+}
+
+/* Hide scrollbars for clean app feeling */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Mobile frame container constraints */
+.mobile-emulator-chassis {
+  box-shadow: 0px 25px 50px -12px rgba(0, 0, 0, 0.5);
+  border: 1px solid #1a1a1a;
+  background-color: var(--background);
+  position: relative;
+}
+
+/* Custom interactive styles */
+.tap-highlight-none {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Card Style Overrides */
+[data-card-style="doodle"] .curhat-card {
+  border: 2px solid var(--accent) !important;
+  box-shadow: 4px 4px 0px 0px var(--accent) !important;
+  background-color: #0d0d0d !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-card-style="doodle"] .curhat-card:active {
+  transform: translate(2px, 2px) !important;
+  box-shadow: 1px 1px 0px 0px var(--accent) !important;
+}
+
+[data-card-style="minimal"] .curhat-card {
+  border: 1px solid var(--border) !important;
+  background-color: #0d0d0d !important;
+  transition: border-color 0.2s ease;
+}
+
+[data-card-style="minimal"] .curhat-card:hover {
+  border-color: var(--accent) !important;
+}
+
+/* Doodle input styling */
+[data-card-style="doodle"] .curhat-input {
+  border: 2px solid var(--border) !important;
+}
+
+[data-card-style="doodle"] .curhat-input:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 3px 3px 0px 0px var(--accent) !important;
+}
+
+[data-card-style="minimal"] .curhat-input {
+  border: 1px solid var(--border) !important;
+}
+
+[data-card-style="minimal"] .curhat-input:focus {
+  border-color: var(--accent) !important;
+}
+
+/* Custom button tap styles */
+.btn-bounce {
+  transition: transform 0.1s ease;
+}
+.btn-bounce:active {
+  transform: scale(0.96);
+}
